@@ -7,8 +7,35 @@ import (
 	"regexp"
 	"strconv"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
+
+func RunAsUser(cmd_str string) {
+	if pid := Findpid("explorer.exe"); pid != 0 {
+		handle, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+		if err != nil {
+			log.Fatalf("error OpenProcess: %v", err)
+		}
+
+		var token windows.Token
+		err = windows.OpenProcessToken(handle, windows.TOKEN_ALL_ACCESS, &token)
+		if err != nil {
+			log.Fatalf("error OpenProcessToken: %v", err)
+		}
+
+		var outProcInfo windows.ProcessInformation
+		var startupInfo windows.StartupInfo
+		appName, err := windows.UTF16PtrFromString(cmd_str)
+		if err != nil {
+			log.Fatalf("error UTF16PtrFromString: %v", err)
+		}
+		err = windows.CreateProcessAsUser(token, appName, nil, nil, nil, true, windows.NORMAL_PRIORITY_CLASS, nil, nil, &startupInfo, &outProcInfo)
+		if err != nil {
+			log.Fatalf("error CreateProcessAsUser: %v", err)
+		}
+	}
+}
 
 // find the pid of process with given image name
 // currently, the pid of the first process is returned, if multiple processes exist.
